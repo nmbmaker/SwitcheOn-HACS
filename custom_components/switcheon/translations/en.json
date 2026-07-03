@@ -12,7 +12,9 @@
 }
 },
 "error": {
-"invalid_qr_link": "Invalid QR Link or Token. Must be 32 hex characters."
+"invalid_qr_link": "Invalid QR Link or Token. Must be 32 hex characters.",
+"invalid_auth": "Authentication failed. Check your User ID and Secret.",
+"unknown": "An unknown error occurred."
 },
 "abort": {
 "already_configured": "Device is already configured"
