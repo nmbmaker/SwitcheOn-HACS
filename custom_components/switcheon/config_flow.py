@@ -1,8 +1,9 @@
 import voluptuous as vol
 import base64
 import binascii
+import aiohttp
 from homeassistant import config_entries
-from .const import DOMAIN
+from .const import DOMAIN, API_URL_STATUS
 
 class SwitcheOnConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
@@ -25,13 +26,23 @@ class SwitcheOnConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 
                 # 3. Ensure it's exactly 32 characters
                 if len(hex_token) != 32:
-                    raise ValueError("Invalid Token Length")
+                    raise ValueError("invalid_qr_link")
 
-                # 4. Convert Hex to Base64 (The 'boxIdBin' format the API wants)
+                # 4. Convert Hex to Base64
                 binary_data = binascii.unhexlify(hex_token)
                 box_id_bin = base64.b64encode(binary_data).decode('utf-8')
 
-                # Store the credentials securely in Home Assistant
+                # 5. LIVE API VERIFICATION
+                async with aiohttp.ClientSession() as session:
+                    params = {
+                        "UserIdBin": user_input["user_id_bin"],
+                        "UserSecret": user_input["user_secret"]
+                    }
+                    async with session.get(API_URL_STATUS, params=params) as resp:
+                        if resp.status != 200:
+                            raise ValueError("invalid_auth")
+
+                # 6. Store the credentials securely
                 return self.async_create_entry(
                     title="My SwitcheOn Box",
                     data={
@@ -41,8 +52,10 @@ class SwitcheOnConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     }
                 )
 
+            except ValueError as e:
+                errors["base"] = str(e)
             except Exception:
-                errors["base"] = "invalid_qr_link"
+                errors["base"] = "unknown"
 
         # The UI form presented to the user
         data_schema = vol.Schema({
