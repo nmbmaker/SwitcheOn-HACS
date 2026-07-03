@@ -5,7 +5,7 @@ This integration connects to the SwitcheOn cloud API to automatically discover y
 
 ## **Features**
 
-* 🔌 **Dynamic Switches:** Automatically creates toggles for all available channels (e.g., "Engine Heater", "Neon 1").  
+* 🔌 **Dynamic Switches:** Automatically creates toggles for all available channels (e.g., "Engine Heater", "Battery Charger").  
 * 🌡️ **Temperature Sensor:** Reads the current box temperature (respects your Celsius/Fahrenheit preference).  
 * 📶 **Signal Strength Sensor:** Tracks the cellular connection strength (in dBm).  
 * 🔄 **Cloud Polling:** Updates device states every 30 seconds.
