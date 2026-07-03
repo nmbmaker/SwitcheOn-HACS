@@ -1,9 +1,9 @@
 {
 "domain": "switcheon",
 "name": "SwitcheOn",
-"documentation": "https://github.com/yourusername/ha-switcheon",
+"documentation": "https://github.com/nmbmaker/SwitcheOn-HACS",
 "dependencies": [],
-"codeowners": ["@yourusername"],
+"codeowners": ["@nmbmaker"],
 "requirements": ["aiohttp"],
 "config_flow": true,
 "iot_class": "cloud_polling",
