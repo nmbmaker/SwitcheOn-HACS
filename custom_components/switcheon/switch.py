@@ -1,6 +1,8 @@
 import logging
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
 from homeassistant.util import slugify
@@ -53,6 +55,7 @@ class SwitcheOnSwitch(CoordinatorEntity, SwitchEntity):
 
         box_data = coordinator.data if isinstance(coordinator.data, dict) else {}
         self._attr_device_info = build_device_info(entry, box_data)
+        self._last_synced_name = self.name
 
     @property
     def name(self):
@@ -68,6 +71,20 @@ class SwitcheOnSwitch(CoordinatorEntity, SwitchEntity):
         if not clean_label:
             clean_label = f"SW{self.channel_index}"
         return f"{self.device_name} {clean_label}"
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Sync renamed channel labels into the HA Entity Registry on every poll."""
+        current_name = self.name
+        if current_name != self._last_synced_name:
+            self._last_synced_name = current_name
+            ent_reg = er.async_get(self.hass)
+            reg_entry = ent_reg.async_get(self.entity_id)
+            if reg_entry and reg_entry.original_name != current_name:
+                ent_reg.async_update_entity(
+                    self.entity_id, original_name=current_name
+                )
+        super()._handle_coordinator_update()
 
     @property
     def extra_state_attributes(self):
