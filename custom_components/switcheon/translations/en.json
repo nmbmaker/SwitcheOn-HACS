@@ -5,7 +5,7 @@
         "title": "Add SwitcheOn Box",
         "description": "Drop a screenshot or snap a photo of your SwitcheOn QR code. Home Assistant will automatically generate and register its own device credentials.",
         "data": {
-          "box_name": "Device Name (e.g., N1538Z)",
+          "box_name": "Device Name (e.g., N12345)",
           "qr_image": "SwitcheOn QR Code Image"
         }
       }
