@@ -16,11 +16,23 @@ from homeassistant.util import dt as dt_util, slugify
 from .const import DOMAIN
 
 
+def get_device_name(entry) -> str:
+    """Resolve the user's device name, preferring entry.title over stale defaults."""
+    title = (entry.title or "").strip()
+    box_name = (entry.data.get("box_name") or "").strip()
+
+    if title and title.lower() not in ("my switcheon", "switcheon"):
+        return title
+    if box_name and box_name.lower() not in ("my switcheon", "switcheon"):
+        return box_name
+    return title or box_name or "SwitcheOn"
+
+
 def build_device_info(entry, box_data: dict) -> DeviceInfo:
     """Build consistent DeviceInfo across all SwitcheOn platforms."""
     box_id_bin = entry.data["box_id_bin"]
     unique_prefix = entry.unique_id or box_id_bin
-    device_name = (entry.data.get("box_name") or entry.title or "SwitcheOn").strip()
+    device_name = get_device_name(entry)
     channels_count = int(
         box_data.get("channels") or len(box_data.get("channelNames") or []) or 2
     )
@@ -59,9 +71,7 @@ class SwitcheOnBaseSensor(CoordinatorEntity, SensorEntity):
         self.entry = entry
         self.box_id_bin = entry.data["box_id_bin"]
         self.unique_prefix = entry.unique_id or self.box_id_bin
-        self.device_name = (
-            entry.data.get("box_name") or entry.title or "SwitcheOn"
-        ).strip()
+        self.device_name = get_device_name(entry)
         self.device_slug = slugify(self.device_name)
 
         box_data = coordinator.data if isinstance(coordinator.data, dict) else {}
