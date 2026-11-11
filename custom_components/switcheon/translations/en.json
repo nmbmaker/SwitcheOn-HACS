@@ -1,24 +1,27 @@
 {
-"config": {
-"step": {
-"user": {
-"title": "Connect your SwitcheOn",
-"description": "Please enter your SwitcheOn details.",
-"data": {
-"box_name": "Device Name (e.g. My SwitcheOn or your Tail Number)",
-"qr_url": "QR Code Link (or 32-character Token)",
-"user_id_bin": "User ID Bin (from intercept)",
-"user_secret": "User Secret (from intercept)"
-}
-}
-},
-"error": {
-"invalid_qr_link": "Invalid QR Link or Token. Must be 32 hex characters.",
-"invalid_auth": "Authentication failed. Check your User ID and Secret.",
-"unknown": "An unknown error occurred."
-},
-"abort": {
-"already_configured": "This specific SwitcheOn box has already been added."
-}
-}
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add SwitcheOn Box",
+        "description": "Upload a screenshot/photo of your SwitcheOn QR code (or paste the QR link below). Home Assistant will automatically generate and register its own device credentials.",
+        "data": {
+          "box_name": "Device Name (e.g., N1538Z)",
+          "qr_image": "Upload or Snap QR Code Screenshot",
+          "qr_url": "Or Paste QR Link / Token (Optional)"
+        }
+      }
+    },
+    "error": {
+      "missing_qr": "Please upload a QR code image or paste the QR link.",
+      "qr_not_detected": "Could not read a QR code from that image. Crop closer to the QR square or paste the link instead.",
+      "invalid_qr_link": "QR code does not contain a valid 32-character SwitcheOn token.",
+      "cannot_register": "Failed to register new Home Assistant credentials with SwitcheOn.",
+      "box_not_found": "Could not link or locate that SwitcheOn box.",
+      "invalid_auth": "SwitcheOn authentication failed.",
+      "cannot_connect": "Unable to reach SwitcheOn cloud API."
+    },
+    "abort": {
+      "already_configured": "This SwitcheOn box is already configured in Home Assistant."
+    }
+  }
 }
