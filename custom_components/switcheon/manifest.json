@@ -1,11 +1,11 @@
 {
-"domain": "switcheon",
-"name": "SwitcheOn",
-"documentation": "https://github.com/nmbmaker/SwitcheOn-HACS",
-"dependencies": [],
-"codeowners": ["@nmbmaker"],
-"requirements": ["aiohttp"],
-"config_flow": true,
-"iot_class": "cloud_polling",
-"version": "1.0.7"
+  "domain": "switcheon",
+  "name": "SwitcheOn",
+  "documentation": "https://github.com/nmbmaker/SwitcheOn-HACS",
+  "dependencies": [],
+  "codeowners": ["@nmbmaker"],
+  "requirements": [],
+  "config_flow": true,
+  "iot_class": "cloud_polling",
+  "version": "1.0.8"
 }
