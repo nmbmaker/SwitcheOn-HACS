@@ -2,7 +2,7 @@ import logging
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
 from homeassistant.util import slugify
 from .const import API_URL_ACTION, DOMAIN
 from .sensor import build_device_info
@@ -71,6 +71,16 @@ class SwitcheOnSwitch(CoordinatorEntity, SwitchEntity):
             clean_label = f"SW{self.channel_index}"
         return f"{self.device_name} {clean_label}"
 
+    @property
+    def extra_state_attributes(self):
+        """Expose read-only High Power status configured in the SwitcheOn app."""
+        box_data = self.coordinator.data if isinstance(self.coordinator.data, dict) else {}
+        exclusive_mask = int(box_data.get("channelsExclusive") or 0)
+        return {
+            "channel_position": f"SW{self.channel_index}",
+            "high_power_channel": bool(exclusive_mask & (1 << self.channel_index)),
+        }
+
     def _get_effective_mask(self, box_data):
         """Use pendingStatus while a cellular command is in flight, else currentStatus."""
         pending = box_data.get("pendingStatus")
@@ -88,49 +98,60 @@ class SwitcheOnSwitch(CoordinatorEntity, SwitchEntity):
         return bool(status_mask & (1 << self.channel_index))
 
     async def async_turn_on(self, **kwargs):
-        """Turn the switch on via SwitcheOn API."""
-        box_data = self.coordinator.data
-        if not isinstance(box_data, dict):
-            raise HomeAssistantError("SwitcheOn box data is unavailable.")
-        if box_data.get("channelsExclusive"):
-            new_status = 1 << self.channel_index
-        else:
-            current_mask = self._get_effective_mask(box_data)
-            new_status = current_mask | (1 << self.channel_index)
-        await self._send_status_update(box_data, new_status)
+        """Pull fresh box state, set this channel bit on, and PUT to SwitcheOn."""
+        await self._pull_and_set_channel(turn_on=True)
 
     async def async_turn_off(self, **kwargs):
-        """Turn the switch off via SwitcheOn API."""
-        box_data = self.coordinator.data
-        if not isinstance(box_data, dict):
-            raise HomeAssistantError("SwitcheOn box data is unavailable.")
-        current_mask = self._get_effective_mask(box_data)
-        new_status = current_mask & ~(1 << self.channel_index)
-        await self._send_status_update(box_data, new_status)
+        """Pull fresh box state, clear this channel bit, and PUT to SwitcheOn."""
+        await self._pull_and_set_channel(turn_on=False)
 
-    async def _send_status_update(self, box_data, requested_status):
-        """Send the requestedStatus bitmask to https://www.switcheon.com/api/req."""
-        session = async_get_clientsession(self.hass)
-
-        payload = {
-            "userIdBin": self.entry.data["user_id_bin"].strip(),
-            "userSecret": self.entry.data["user_secret"].strip(),
-            "boxIdBin": box_data.get("boxIdBin", self.box_id_bin),
-            "requestedStatus": requested_status,
-        }
-
-        async with session.put(API_URL_ACTION, json=payload) as response:
-            if 200 <= response.status < 300:
-                box_data["pendingStatus"] = requested_status
-                self.async_write_ha_state()
-                await self.coordinator.async_request_refresh()
-            else:
-                response_text = await response.text()
-                _LOGGER.error(
-                    "SwitcheOn PUT failed (%s): %s",
-                    response.status,
-                    response_text,
-                )
+    async def _pull_and_set_channel(self, turn_on: bool) -> None:
+        """Serialize GET -> bitmask calculation -> PUT so phone/concurrent toggles never collide."""
+        async with self.coordinator.action_lock:
+            try:
+                fresh_box = await self.coordinator.async_fetch_box()
+            except UpdateFailed as err:
                 raise HomeAssistantError(
-                    f"SwitcheOn API error {response.status}: {response_text}"
-                )
+                    f"Failed to fetch latest SwitcheOn state before switching: {err}"
+                ) from err
+            except Exception as err:
+                raise HomeAssistantError(
+                    f"Unable to reach SwitcheOn cloud before switching: {err}"
+                ) from err
+
+            current_mask = self._get_effective_mask(fresh_box)
+            channel_bit = 1 << self.channel_index
+            exclusive_mask = int(fresh_box.get("channelsExclusive") or 0)
+
+            if turn_on:
+                if exclusive_mask & channel_bit:
+                    # Turning ON a High Power channel: turn off any OTHER High Power channels, keep low-power ones
+                    requested_status = (current_mask & ~exclusive_mask) | channel_bit
+                else:
+                    # Turning ON a normal low-power channel: leave everything else as-is
+                    requested_status = current_mask | channel_bit
+            else:
+                requested_status = current_mask & ~channel_bit
+
+            session = async_get_clientsession(self.hass)
+            payload = {
+                "userIdBin": self.entry.data["user_id_bin"].strip(),
+                "userSecret": self.entry.data["user_secret"].strip(),
+                "boxIdBin": fresh_box.get("boxIdBin", self.box_id_bin),
+                "requestedStatus": requested_status,
+            }
+
+            async with session.put(API_URL_ACTION, json=payload) as response:
+                if 200 <= response.status < 300:
+                    fresh_box["pendingStatus"] = requested_status
+                    self.coordinator.async_set_updated_data(fresh_box)
+                else:
+                    response_text = await response.text()
+                    _LOGGER.error(
+                        "SwitcheOn PUT failed (%s): %s",
+                        response.status,
+                        response_text,
+                    )
+                    raise HomeAssistantError(
+                        f"SwitcheOn API error {response.status}: {response_text}"
+                    )
