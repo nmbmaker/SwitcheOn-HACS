@@ -45,24 +45,22 @@ def _decode_qr_upload(hass, uploaded_file_id: str) -> str:
 
 
 class SwitcheOnConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Zero-credential QR setup flow for SwitcheOn."""
+    """Zero-credential QR image setup flow for SwitcheOn."""
 
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
-        """Prompt solely for Device Name and QR Screenshot (or optional URL)."""
+        """Prompt solely for Device Name and QR Screenshot/Photo."""
         errors = {}
 
         if user_input is not None:
             box_name = (user_input.get("box_name") or "").strip() or "SwitcheOn"
             qr_image_id = user_input.get("qr_image")
-            raw_url = (user_input.get("qr_url") or "").strip()
+            qr_source_text = ""
 
-            qr_source_text = raw_url
-
-            if not qr_image_id and not qr_source_text:
-                errors["base"] = "missing_qr"
-            elif qr_image_id and not qr_source_text:
+            if not qr_image_id:
+                errors["qr_image"] = "missing_qr"
+            else:
                 try:
                     qr_source_text = await self.hass.async_add_executor_job(
                         _decode_qr_upload, self.hass, qr_image_id
@@ -77,7 +75,7 @@ class SwitcheOnConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not errors:
                 match = re.search(r"([0-9a-fA-F]{32})", qr_source_text)
                 if not match:
-                    errors["base"] = "invalid_qr_link"
+                    errors["qr_image"] = "invalid_qr_code"
                 else:
                     hex_token = match.group(1).upper()
                     box_id_bin = base64.b64encode(
@@ -115,10 +113,9 @@ class SwitcheOnConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data_schema = vol.Schema(
             {
                 vol.Required("box_name"): TextSelector(),
-                vol.Optional("qr_image"): FileSelector(
+                vol.Required("qr_image"): FileSelector(
                     FileSelectorConfig(accept="image/*")
                 ),
-                vol.Optional("qr_url"): TextSelector(),
             }
         )
 
