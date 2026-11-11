@@ -13,6 +13,7 @@ from homeassistant.const import (
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util, slugify
+
 from .const import DOMAIN
 
 
@@ -33,9 +34,15 @@ def build_device_info(entry, box_data: dict) -> DeviceInfo:
     box_id_bin = entry.data["box_id_bin"]
     unique_prefix = entry.unique_id or box_id_bin
     device_name = get_device_name(entry)
-    channels_count = int(
-        box_data.get("channels") or len(box_data.get("channelNames") or []) or 2
-    )
+
+    if box_data.get("hvacMode") is not None or box_data.get("deviceType") == "T":
+        model_label = "SwitcheOn Cellular Thermostat"
+    else:
+        channels_count = int(
+            box_data.get("channels") or len(box_data.get("channelNames") or []) or 2
+        )
+        model_label = f"SwitcheOn {channels_count}-Channel Box"
+
     sw_ver = box_data.get("swVersion")
     modem_fw = box_data.get("firmware")
 
@@ -43,7 +50,7 @@ def build_device_info(entry, box_data: dict) -> DeviceInfo:
         identifiers={(DOMAIN, unique_prefix)},
         name=f"SwitcheOn {device_name}",
         manufacturer="SwitcheOn",
-        model=f"SwitcheOn {channels_count}-Channel Box",
+        model=model_label,
         sw_version=str(sw_ver) if sw_ver is not None else None,
         hw_version=str(modem_fw) if modem_fw else None,
     )
