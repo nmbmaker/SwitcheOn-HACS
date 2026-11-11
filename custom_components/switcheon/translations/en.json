@@ -3,18 +3,17 @@
     "step": {
       "user": {
         "title": "Add SwitcheOn Box",
-        "description": "Upload a screenshot/photo of your SwitcheOn QR code (or paste the QR link below). Home Assistant will automatically generate and register its own device credentials.",
+        "description": "Drop a screenshot or snap a photo of your SwitcheOn QR code. Home Assistant will automatically generate and register its own device credentials.",
         "data": {
-          "box_name": "Device Name (e.g., N1538Z)",
-          "qr_image": "Upload or Snap QR Code Screenshot",
-          "qr_url": "Or Paste QR Link / Token (Optional)"
+          "box_name": "Device Name (e.g., N12345)",
+          "qr_image": "SwitcheOn QR Code Image"
         }
       }
     },
     "error": {
-      "missing_qr": "Please upload a QR code image or paste the QR link.",
-      "qr_not_detected": "Could not read a QR code from that image. Crop closer to the QR square or paste the link instead.",
-      "invalid_qr_link": "QR code does not contain a valid 32-character SwitcheOn token.",
+      "missing_qr": "Please upload a screenshot or photo of the SwitcheOn QR code.",
+      "qr_not_detected": "Could not read a QR code from that image. Try cropping closer to the QR square.",
+      "invalid_qr_code": "That QR code does not contain a valid 32-character SwitcheOn activation token.",
       "cannot_register": "Failed to register new Home Assistant credentials with SwitcheOn.",
       "box_not_found": "Could not link or locate that SwitcheOn box.",
       "invalid_auth": "SwitcheOn authentication failed.",
