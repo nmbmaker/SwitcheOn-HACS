@@ -6,6 +6,7 @@ from homeassistant.components.image import ImageEntity
 from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util, slugify
+
 from .const import DOMAIN
 from .sensor import build_device_info, get_device_name
 
