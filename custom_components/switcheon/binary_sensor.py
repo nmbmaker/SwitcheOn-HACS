@@ -6,7 +6,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 from .const import DOMAIN
-from .sensor import build_device_info
+from .sensor import build_device_info, get_device_name
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -26,7 +26,7 @@ class SwitcheOnOnlineSensor(CoordinatorEntity, BinarySensorEntity):
         super().__init__(coordinator)
         self.box_id_bin = entry.data["box_id_bin"]
         unique_prefix = entry.unique_id or self.box_id_bin
-        device_name = (entry.data.get("box_name") or entry.title or "SwitcheOn").strip()
+        device_name = get_device_name(entry)
         device_slug = slugify(device_name)
 
         box_data = coordinator.data if isinstance(coordinator.data, dict) else {}
