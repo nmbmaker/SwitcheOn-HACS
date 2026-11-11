@@ -1,7 +1,7 @@
 # SwitcheOn Custom Integration for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
-[![version](https://img.shields.io/badge/version-1.2.1-blue.svg)](https://github.com/nmbmaker/SwitcheOn-HACS/releases)
+[![version](https://img.shields.io/badge/version-1.2.2-blue.svg)](https://github.com/nmbmaker/SwitcheOn-HACS/releases)
 
 An unofficial Home Assistant custom integration for [SwitcheOn](https://switcheon.com/) LTE-M / NB-IoT cellular remote power switches. Control aircraft engine preheaters, hangar lights, battery tenders, and remote equipment directly from Home Assistant—with zero manual token extraction or proxy sniffing required.
 
