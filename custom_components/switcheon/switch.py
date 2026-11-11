@@ -5,6 +5,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 from .const import API_URL_ACTION, DOMAIN
+from .sensor import build_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     )
 
     switches = [
-        SwitcheOnSwitch(coordinator, entry, i, channels_count)
+        SwitcheOnSwitch(coordinator, entry, i)
         for i in range(channels_count)
     ]
     async_add_entities(switches)
@@ -36,7 +37,7 @@ class SwitcheOnSwitch(CoordinatorEntity, SwitchEntity):
 
     _attr_has_entity_name = False
 
-    def __init__(self, coordinator, entry, channel_index, channels_count):
+    def __init__(self, coordinator, entry, channel_index):
         """Initialize the switch."""
         super().__init__(coordinator)
         self.channel_index = channel_index
@@ -52,12 +53,8 @@ class SwitcheOnSwitch(CoordinatorEntity, SwitchEntity):
         self._attr_unique_id = f"{unique_prefix}_sw{channel_index}"
         self.entity_id = f"switch.switcheon_{device_slug}_sw{channel_index}"
 
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, unique_prefix)},
-            "name": f"SwitcheOn {self.device_name}",
-            "manufacturer": "SwitcheOn",
-            "model": f"SwitcheOn {channels_count}-Channel Box",
-        }
+        box_data = coordinator.data if isinstance(coordinator.data, dict) else {}
+        self._attr_device_info = build_device_info(entry, box_data)
 
     @property
     def name(self):
@@ -95,8 +92,11 @@ class SwitcheOnSwitch(CoordinatorEntity, SwitchEntity):
         box_data = self.coordinator.data
         if not isinstance(box_data, dict):
             raise HomeAssistantError("SwitcheOn box data is unavailable.")
-        current_mask = self._get_effective_mask(box_data)
-        new_status = current_mask | (1 << self.channel_index)
+        if box_data.get("channelsExclusive"):
+            new_status = 1 << self.channel_index
+        else:
+            current_mask = self._get_effective_mask(box_data)
+            new_status = current_mask | (1 << self.channel_index)
         await self._send_status_update(box_data, new_status)
 
     async def async_turn_off(self, **kwargs):
