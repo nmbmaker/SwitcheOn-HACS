@@ -1,82 +1,85 @@
-import logging
-import aiohttp
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from .const import DOMAIN, API_URL_ACTION
-
-_LOGGER = logging.getLogger(__name__)
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.util import slugify
+from .const import DOMAIN
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    """Set up the SwitcheOn switches."""
+    """Set up SwitcheOn switches from a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
     
-    channels = coordinator.data.get("channels", 0)
-    names = coordinator.data.get("channelNames", [])
+    channels_count = coordinator.data["boxes"][0]["channels"]
     
-    entities = []
-    for i in range(channels):
-        name = names[i] if i < len(names) else f"Relay {i+1}"
-        entities.append(SwitcheOnRelay(coordinator, entry, i, name))
+    switches = []
+    for i in range(channels_count):
+        switches.append(SwitcheOnSwitch(coordinator, entry, i))
         
-    async_add_entities(entities)
+    async_add_entities(switches)
 
-class SwitcheOnRelay(CoordinatorEntity, SwitchEntity):
+
+class SwitcheOnSwitch(CoordinatorEntity, SwitchEntity):
     """Representation of a SwitcheOn Relay."""
-    
-    # This tells HA to automatically prepend the Device Name to this switch's name!
+
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator, entry, channel_index, name):
+    def __init__(self, coordinator, entry, channel_index):
+        """Initialize the switch."""
         super().__init__(coordinator)
-        self.entry = entry
         self.channel_index = channel_index
-        self.bit_value = 1 << channel_index
+        self.entry = entry
+        self.qr_token = entry.data["qr_token"]
+        self.device_name = entry.data["device_name"]
         
-        self._attr_name = name
-        self._attr_unique_id = f"{entry.data['box_id_bin']}_relay_{channel_index}"
+        self.channel_name = coordinator.data["boxes"][0]["channelNames"][channel_index]
         
-        # This groups the switch under a single physical Device in Home Assistant
+        self._attr_name = self.channel_name
+        self._attr_unique_id = f"{self.qr_token}_channel_{channel_index}"
+        self.entity_id = f"switch.{slugify(self.device_name)}_{slugify(self.channel_name)}"
+
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.data["box_id_bin"])},
-            "name": entry.data.get("box_name", "SwitcheOn Box"),
+            "identifiers": {(DOMAIN, self.qr_token)},
+            "name": self.device_name,
             "manufacturer": "SwitcheOn",
+            "model": "SwitcheOn Box",
         }
 
     @property
     def is_on(self):
-        """Return true if the switch is on."""
-        if self.coordinator.data is None:
-            return False
-        current_status = self.coordinator.data.get("currentStatus", 0)
-        return bool(current_status & self.bit_value)
+        """Return true if switch is on."""
+        status_mask = self.coordinator.data["boxes"][0]["currentStatus"]
+        return bool(status_mask & (1 << self.channel_index))
 
     async def async_turn_on(self, **kwargs):
-        await self._send_action(True)
+        """Turn the switch on via SwitcheOn API."""
+        box_data = self.coordinator.data["boxes"][0]
+        current_status = box_data["currentStatus"]
+        new_status = current_status | (1 << self.channel_index)
+        
+        await self._send_status_update(new_status)
 
     async def async_turn_off(self, **kwargs):
-        await self._send_action(False)
-
-    async def _send_action(self, target_state):
-        current_status = self.coordinator.data.get("currentStatus", 0)
+        """Turn the switch off via SwitcheOn API."""
+        box_data = self.coordinator.data["boxes"][0]
+        current_status = box_data["currentStatus"]
+        new_status = current_status & ~(1 << self.channel_index)
         
-        if target_state:
-            new_status = current_status | self.bit_value
-        else:
-            new_status = current_status & ~self.bit_value
+        await self._send_status_update(new_status)
+
+    async def _send_status_update(self, new_status):
+        """Send the updated status bitmask to the SwitcheOn API."""
+        box_data = self.coordinator.data["boxes"][0]
+        session = async_get_clientsession(self.hass)
+        url = "https://www.switcheon.com/api/BoxUser"
         
         payload = {
             "userIdBin": self.entry.data["user_id_bin"],
-            "userSecret": self.entry.data["user_secret"],
-            "boxIdBin": self.entry.data["box_id_bin"],
-            "requestedStatus": new_status
+            "boxIdBin": box_data["boxIdBin"],
+            "currentStatus": new_status,
         }
         
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(API_URL_ACTION, json=payload) as resp:
-                    if resp.status == 200:
-                        await self.coordinator.async_request_refresh()
-                    else:
-                        _LOGGER.error("Failed to toggle relay. Status: %s", resp.status)
-        except Exception as err:
-            _LOGGER.error("Error communicating with SwitcheOn API: %s", err)
+        async with session.put(url, json=payload) as response:
+            if response.status == 200:
+                await self.coordinator.async_request_refresh()
+            else:
+                response_text = await response.text()
+                raise Exception(f"Failed to control SwitcheOn device: {response.status} - {response_text}")
