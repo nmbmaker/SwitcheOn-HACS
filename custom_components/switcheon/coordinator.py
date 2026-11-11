@@ -2,23 +2,26 @@ import asyncio
 import aiohttp
 import logging
 from datetime import timedelta
+
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from .const import API_URL_STATUS, DOMAIN, SCAN_INTERVAL
+
+from .const import API_URL_STATUS, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class SwitcheOnCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching SwitcheOn data and serializing relay updates."""
+    """Class to manage fetching SwitcheOn data and serializing commands."""
 
     def __init__(self, hass, entry):
         """Initialize."""
+        interval = int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
         super().__init__(
             hass,
             _LOGGER,
             name=f"{DOMAIN}_{entry.entry_id}",
-            update_interval=timedelta(seconds=SCAN_INTERVAL),
+            update_interval=timedelta(seconds=interval),
         )
         self.entry = entry
         self.action_lock = asyncio.Lock()
