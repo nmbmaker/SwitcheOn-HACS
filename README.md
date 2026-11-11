@@ -1,59 +1,108 @@
-# **SwitcheOn Custom Integration for Home Assistant**
+# SwitcheOn Custom Integration for Home Assistant
 
-A custom component for Home Assistant that integrates [SwitcheOn](https://switcheon.com/) remote power switching and temperature monitoring devices.  
-This integration connects to the SwitcheOn cloud API to automatically discover your boxes, create switches for your relays (using the custom names you set in the app), and provide sensors for temperature and cellular signal strength.
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/nmbmaker/SwitcheOn-HACS/releases)
 
-## **Features**
+An unofficial Home Assistant custom integration for [SwitcheOn](https://switcheon.com/) LTE-M / NB-IoT cellular remote power switches. Control aircraft engine preheaters, hangar lights, battery tenders, and remote equipment directly from Home Assistant—with zero manual token extraction or proxy sniffing required.
 
-* 🔌 **Dynamic Switches:** Automatically creates toggles for all available channels (e.g., "Engine Heater", "Battery Charger").  
-* 🌡️ **Temperature Sensor:** Reads the current box temperature (respects your Celsius/Fahrenheit preference).  
-* 📶 **Signal Strength Sensor:** Tracks the cellular connection strength (in dBm).  
-* 🔄 **Cloud Polling:** Updates device states every 30 seconds.
+---
 
-## **⚠️ Important Prerequisite: Getting Your Credentials**
+## Features
 
-SwitcheOn does not use standard usernames and passwords. They use a unique QR code pairing system. To use this integration, **you must intercept the web traffic from the SwitcheOn mobile app** once to extract your account's UserIdBin and UserSecret.
+- **Zero-Credential QR Setup:** Upload a screenshot or snap a mobile camera photo of your SwitcheOn QR code during setup. Home Assistant automatically generates and registers its own isolated device credentials in the background.
+- **2-Channel & 4-Channel Support:** Dynamically detects your box model (`2-Channel` or `4-Channel`), respects mutually exclusive relay configurations, and tracks in-flight cellular `pendingStatus` transitions so switches don't bounce while waiting for LTE-M confirmation.
+- **Multi-Box Friendly Entity Naming:** Clean, predictable entity IDs (`switch.switcheon_<device_name>_sw0`, `sw1`, etc.) so multiple hangar or remote boxes never collide, paired with live friendly channel names pulled from the SwitcheOn app.
+- **Ambient Temperature Monitoring:** Live temperature sensor respecting your box's Fahrenheit/Celsius setting with long-term statistics graphing.
+- **Built-In Backup QR Code (`image`):** Generates a scannable QR code right on the Home Assistant device page—making it easy to pair a new phone or share access without climbing behind hangar equipment.
+- **Subscription Renewal & Cellular Diagnostics:** Tracks your box's `paidUntil` renewal date, auto-renew status, LTE-M signal strength (dBm), online connectivity state, and last cellular check-in timestamp.
 
-### **How to intercept your credentials:**
+---
 
-1. **Install HTTP Toolkit:** Download and install [HTTP Toolkit](https://httptoolkit.com/) on your PC or Mac.  
-2. **Connect an Android Device:** \* **Option A (Emulator):** Use an Android Studio Emulator (Target: "Google APIs").  
-   * **Option B (Physical Device):** Plug in your Android phone, enable USB Debugging, and use HTTP Toolkit's "Android device via ADB" to connect. *Note: You may need to use the "Patch App" feature in HTTP Toolkit for the official SwitcheOn app to trust the proxy on a modern physical phone.*  
-3. **Capture Traffic:** Open the SwitcheOn app on the connected device and ensure you are logged in / have scanned your box's QR code.  
-4. **Find the Credentials:** In HTTP Toolkit, look for a GET request going to:  
-   https://www.switcheon.com/api/User?UserIdBin=...  
-5. **Save the Data:** From that URL (or the JSON response body), copy your specific:  
-   * UserIdBin (e.g., KjqubefLcUiOkYbGMkK9dQ==)  
-   * UserSecret (e.g., iuJvxkoNImuKvxpIimkyGBX...)
+## Entities Created
 
-Keep these safe\! You will need them during the Home Assistant setup.
+Assuming a Device Name of `N12345` during setup:
 
-## **Installation (via HACS)**
+| Platform | Entity ID | Description |
+| :--- | :--- | :--- |
+| `switch` | `switch.switcheon_n12345_sw0` .. `sw3` | Individual relay controls (2 or 4 channels depending on model) |
+| `sensor` | `sensor.switcheon_n12345_temperature` | Ambient temperature reading (`°F` or `°C`) |
+| `sensor` | `sensor.switcheon_n12345_signal_strength` | Cellular LTE-M signal strength (`dBm`) |
+| `sensor` | `sensor.switcheon_n12345_renewal_date` | Annual cellular service expiration/renewal date (`YYYY-MM-DD`) |
+| `sensor` | `sensor.switcheon_n12345_last_checkin` | Timestamp of the box's most recent cloud check-in |
+| `binary_sensor` | `binary_sensor.switcheon_n12345_cellular_status` | Online / Offline connectivity status |
+| `image` | `image.switcheon_n12345_qr_code` | Scannable activation QR code (+ raw activation URL attribute) |
 
-The easiest way to install this integration is using the [Home Assistant Community Store (HACS)](https://hacs.xyz/).
+---
 
-1. Open HACS in your Home Assistant dashboard.  
-2. Click the three dots ⋮ in the top right corner and select **Custom repositories**.  
-3. Paste the URL of this repository.  
-4. Select **Integration** as the category and click **Add**.  
-5. Close the modal, search for "SwitcheOn" in HACS, and click **Download**.  
-6. **Restart Home Assistant.**
+## Installation
 
-## **Configuration**
+### Option 1: HACS (Recommended)
 
-Once installed and Home Assistant has restarted:
+1. Open **HACS** in Home Assistant.
+2. Click the three-dot menu (**⋮**) in the top-right corner and select **Custom repositories**.
+3. Paste `https://github.com/nmbmaker/SwitcheOn-HACS` into the repository field, select **Integration** as the category, and click **Add**.
+4. Locate **SwitcheOn** in HACS and click **Download**.
+5. Restart Home Assistant (**Developer Tools** -> **YAML** -> **Restart**).
 
-1. Go to **Settings** \> **Devices & Services**.  
-2. Click **\+ Add Integration** in the bottom right.  
-3. Search for **SwitcheOn**.  
-4. You will be prompted to enter three things:  
-   * **QR Code Link / Token:** Paste the full HTTPS://SWITCHEON.COM/ACT/... link or just the 32-character hex token from your device's QR code.  
-   * **User ID Bin:** The ID you extracted via HTTP Toolkit (ends in \==).  
-   * **User Secret:** The Secret string you extracted via HTTP Toolkit.  
-5. Click Submit. Your devices will instantly appear\!
+### Option 2: Manual Installation
 
-## **Troubleshooting**
+1. Download the latest release from this repository.
+2. Copy the `custom_components/switcheon` folder into your Home Assistant `/config/custom_components/` directory.
+3. Restart Home Assistant.
 
-* **Device already configured:** You can only add a specific SwitcheOn box token once.  
-* **Invalid QR Link:** Ensure you are pasting the exact 32-character hexadecimal string found in the QR code (or the full URL containing it).  
-* **Switches aren't updating immediately:** This integration relies on cloud polling. When you toggle a switch, it sends the command immediately, but the UI state may take up to 30 seconds to reflect the cloud's confirmed state.
+---
+
+## Setup & Configuration
+
+1. In Home Assistant, navigate to **Settings** -> **Devices & Services** and click **+ Add Integration**.
+2. Search for and select **SwitcheOn**.
+3. Fill in the setup prompt:
+   - **Device Name:** Enter an identifier for this box (for example, `N12345` or `North Hangar`).
+   - **Upload or Snap QR Code Screenshot:** Upload a screenshot of the QR code from your SwitcheOn mobile app (or snap a clear photo of the physical QR sticker on the box using the Home Assistant mobile app).
+   - **Or Paste QR Link / Token *(Optional)*:** If you already copied the `https://www.switcheon.com/act/...` URL or 32-character hex token with your phone's camera app, you can paste it directly instead of uploading an image.
+4. Click **Submit**. Home Assistant will register itself (appearing as `Home Assistant` in your SwitcheOn app's user list), link the box, and create all entities automatically.
+
+> **Adding Additional Boxes:** Simply click **Add Entry** under the SwitcheOn integration card and upload the next box's QR code. Home Assistant will automatically reuse its local SwitcheOn identity across all of your boxes.
+
+---
+
+## Notes on Cellular Operation
+
+**Command Latency:** SwitcheOn boxes communicate over low-power LTE-M / NB-IoT cellular networks. When you toggle a switch in Home Assistant, the switch immediately enters an optimistic pending state while the cellular network wakes the relay (typically 3–15 seconds).
+
+**Polling Interval:** Cloud state is polled every 60 seconds, with an immediate refresh requested whenever a relay command is sent.
+
+**Channel Renaming:** Friendly switch names dynamically follow the channel labels configured in your SwitcheOn mobile app while keeping your underlying switch.switcheon_<device>_sw0 entity IDs unchanged so automations never break.
+
+---
+
+**Disclaimer**
+
+This project is an independent community integration and is not affiliated with, endorsed by, or supported by SwitcheOn. Always follow manufacturer electrical load limits (15A max) and aviation/hangar safety guidelines when operating unattended preheating equipment.
+
+---
+
+## Example Automation: Annual Renewal Reminder
+
+Because `sensor.switcheon_<device>_renewal_date` uses Home Assistant's native `date` device class (and exposes an `auto_renew` attribute), you can trigger a mobile notification 14 days before your cellular subscription expires—especially helpful if a credit card expires and auto-renew turns off, please be sure to change the example sensors to your specific ones:
+
+```yaml
+alias: "Hangar SwitcheOn - Cellular Renewal Reminder"
+description: "Notify 14 days before the SwitcheOn cellular plan expires"
+triggers:
+  - trigger: time
+    at: "09:00:00"
+conditions:
+  - condition: template
+    value_template: >
+      {% set renewal = states('sensor.switcheon_n12345_renewal_date') | as_datetime | as_local %}
+      {{ (renewal.date() - now().date()).days == 14 }}
+actions:
+  - action: notify.mobile_app_your_phone
+    data:
+      title: "SwitcheOn Renewal Approaching"
+      message: >
+        SwitcheOn N12345 service expires on {{ states('sensor.switcheon_n12345_renewal_date') }}.
+        Status: {{ state_attr('sensor.switcheon_n12345_renewal_date', 'subscription_info') }}
+
+
