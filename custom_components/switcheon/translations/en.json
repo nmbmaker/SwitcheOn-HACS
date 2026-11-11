@@ -5,7 +5,7 @@
         "title": "Add SwitcheOn Box",
         "description": "Drop a screenshot or snap a photo of your SwitcheOn QR code. Home Assistant will automatically generate and register its own device credentials.",
         "data": {
-          "box_name": "Device Name (e.g., N12345)",
+          "box_name": "Device Name (e.g., N1538Z)",
           "qr_image": "SwitcheOn QR Code Image"
         }
       }
@@ -21,6 +21,17 @@
     },
     "abort": {
       "already_configured": "This SwitcheOn box is already configured in Home Assistant."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "SwitcheOn Polling Settings",
+        "description": "Configure how frequently Home Assistant polls the SwitcheOn cloud for this box (15–600 seconds).",
+        "data": {
+          "scan_interval": "Polling Interval"
+        }
+      }
     }
   }
 }
