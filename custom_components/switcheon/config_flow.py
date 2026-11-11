@@ -54,9 +54,7 @@ class SwitcheOnConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            box_name = (
-                user_input.get("box_name", "My SwitcheOn").strip() or "My SwitcheOn"
-            )
+            box_name = (user_input.get("box_name") or "").strip() or "SwitcheOn"
             qr_image_id = user_input.get("qr_image")
             raw_url = (user_input.get("qr_url") or "").strip()
 
@@ -116,7 +114,7 @@ class SwitcheOnConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         data_schema = vol.Schema(
             {
-                vol.Required("box_name", default="My SwitcheOn"): TextSelector(),
+                vol.Required("box_name"): TextSelector(),
                 vol.Optional("qr_image"): FileSelector(
                     FileSelectorConfig(accept="image/*")
                 ),
