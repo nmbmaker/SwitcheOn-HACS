@@ -1,10 +1,12 @@
 import aiohttp
 import logging
 from datetime import timedelta
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from .const import DOMAIN, API_URL_STATUS, SCAN_INTERVAL
+from .const import API_URL_STATUS, DOMAIN, SCAN_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
+
 
 class SwitcheOnCoordinator(DataUpdateCoordinator):
     """Class to manage fetching SwitcheOn data."""
@@ -14,31 +16,35 @@ class SwitcheOnCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             _LOGGER,
-            name=DOMAIN,
+            name=f"{DOMAIN}_{entry.entry_id}",
             update_interval=timedelta(seconds=SCAN_INTERVAL),
         )
         self.entry = entry
 
     async def _async_update_data(self):
-        """Fetch data from SwitcheOn API."""
+        """Fetch data from SwitcheOn API and return the single matching box dict."""
         params = {
-            "UserIdBin": self.entry.data["user_id_bin"],
-            "UserSecret": self.entry.data["user_secret"]
+            "UserIdBin": self.entry.data["user_id_bin"].strip(),
+            "UserSecret": self.entry.data["user_secret"].strip(),
         }
+        session = async_get_clientsession(self.hass)
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(API_URL_STATUS, params=params) as resp:
-                    if resp.status != 200:
-                        raise UpdateFailed(f"API returned status {resp.status}")
-                    
-                    data = await resp.json()
-                    
-                    # Extract our specific box from the response array
-                    boxes = data.get("boxes", [])
-                    for box in boxes:
-                        if box.get("boxIdBin") == self.entry.data["box_id_bin"]:
-                            return box
-                            
-                    raise UpdateFailed("Box ID not found in API response")
+            async with session.get(API_URL_STATUS, params=params) as resp:
+                if resp.status != 200:
+                    raise UpdateFailed(f"API returned status {resp.status}")
+
+                data = await resp.json()
+                boxes = data.get("boxes") or []
+                for box in boxes:
+                    if box.get("boxIdBin") == self.entry.data["box_id_bin"]:
+                        return box
+
+                raise UpdateFailed(
+                    f"Box {self.entry.data['box_id_bin']} not found in account boxes"
+                )
+        except UpdateFailed:
+            raise
+        except aiohttp.ClientError as err:
+            raise UpdateFailed(f"Error communicating with SwitcheOn API: {err}") from err
         except Exception as err:
-            raise UpdateFailed(f"Error communicating with API: {err}")
+            raise UpdateFailed(f"Unexpected SwitcheOn error: {err}") from err
