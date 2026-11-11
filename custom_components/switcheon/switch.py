@@ -5,7 +5,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
 from homeassistant.util import slugify
 from .const import API_URL_ACTION, DOMAIN
-from .sensor import build_device_info
+from .sensor import build_device_info, get_device_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,9 +43,7 @@ class SwitcheOnSwitch(CoordinatorEntity, SwitchEntity):
         self.channel_index = channel_index
         self.entry = entry
         self.box_id_bin = entry.data["box_id_bin"]
-        self.device_name = (
-            entry.data.get("box_name") or entry.title or "SwitcheOn"
-        ).strip()
+        self.device_name = get_device_name(entry)
 
         unique_prefix = entry.unique_id or self.box_id_bin
         device_slug = slugify(self.device_name)
@@ -125,10 +123,8 @@ class SwitcheOnSwitch(CoordinatorEntity, SwitchEntity):
 
             if turn_on:
                 if exclusive_mask & channel_bit:
-                    # Turning ON a High Power channel: turn off any OTHER High Power channels, keep low-power ones
                     requested_status = (current_mask & ~exclusive_mask) | channel_bit
                 else:
-                    # Turning ON a normal low-power channel: leave everything else as-is
                     requested_status = current_mask | channel_bit
             else:
                 requested_status = current_mask & ~channel_bit
