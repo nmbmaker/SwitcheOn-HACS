@@ -1,4 +1,5 @@
 import logging
+
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
@@ -6,6 +7,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
 from homeassistant.util import slugify
+
 from .const import API_URL_ACTION, DOMAIN
 from .sensor import build_device_info, get_device_name
 
@@ -21,11 +23,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
         _LOGGER.error("SwitcheOn: Unexpected coordinator data: %s", box_data)
         return
 
-    channels_count = int(
-        box_data.get("channels")
-        or len(box_data.get("channelNames") or [])
-        or 2
-    )
+    channels_count = int(box_data.get("channels") or 0)
+    if channels_count <= 0 and box_data.get("hvacMode") is not None:
+        # Pure thermostat hardware with 0 relay channels
+        return
+    if channels_count <= 0:
+        channels_count = len(box_data.get("channelNames") or []) or 2
 
     switches = [
         SwitcheOnSwitch(coordinator, entry, i)
