@@ -1,3 +1,4 @@
+import asyncio
 import aiohttp
 import logging
 from datetime import timedelta
@@ -9,7 +10,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class SwitcheOnCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching SwitcheOn data."""
+    """Class to manage fetching SwitcheOn data and serializing relay updates."""
 
     def __init__(self, hass, entry):
         """Initialize."""
@@ -20,28 +21,33 @@ class SwitcheOnCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=SCAN_INTERVAL),
         )
         self.entry = entry
+        self.action_lock = asyncio.Lock()
 
-    async def _async_update_data(self):
-        """Fetch data from SwitcheOn API and return the single matching box dict."""
+    async def async_fetch_box(self) -> dict:
+        """Fetch the latest single matching box dict directly from SwitcheOn cloud."""
         params = {
             "UserIdBin": self.entry.data["user_id_bin"].strip(),
             "UserSecret": self.entry.data["user_secret"].strip(),
         }
         session = async_get_clientsession(self.hass)
+        async with session.get(API_URL_STATUS, params=params) as resp:
+            if resp.status != 200:
+                raise UpdateFailed(f"API returned status {resp.status}")
+
+            data = await resp.json()
+            boxes = data.get("boxes") or []
+            for box in boxes:
+                if box.get("boxIdBin") == self.entry.data["box_id_bin"]:
+                    return box
+
+            raise UpdateFailed(
+                f"Box {self.entry.data['box_id_bin']} not found in account boxes"
+            )
+
+    async def _async_update_data(self):
+        """Periodic background poll."""
         try:
-            async with session.get(API_URL_STATUS, params=params) as resp:
-                if resp.status != 200:
-                    raise UpdateFailed(f"API returned status {resp.status}")
-
-                data = await resp.json()
-                boxes = data.get("boxes") or []
-                for box in boxes:
-                    if box.get("boxIdBin") == self.entry.data["box_id_bin"]:
-                        return box
-
-                raise UpdateFailed(
-                    f"Box {self.entry.data['box_id_bin']} not found in account boxes"
-                )
+            return await self.async_fetch_box()
         except UpdateFailed:
             raise
         except aiohttp.ClientError as err:
