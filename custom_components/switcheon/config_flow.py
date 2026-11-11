@@ -9,13 +9,26 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.components.file_upload import process_uploaded_file
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     FileSelector,
     FileSelectorConfig,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     TextSelector,
 )
-from .const import API_URL_LINK, API_URL_STATUS, DOMAIN
+
+from .const import (
+    API_URL_LINK,
+    API_URL_STATUS,
+    CONF_SCAN_INTERVAL,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    MAX_SCAN_INTERVAL,
+    MIN_SCAN_INTERVAL,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,6 +61,12 @@ class SwitcheOnConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Zero-credential QR image setup flow for SwitcheOn."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry):
+        """Return the options flow handler for configuring polling interval."""
+        return SwitcheOnOptionsFlow()
 
     async def async_step_user(self, user_input=None):
         """Prompt solely for Device Name and QR Screenshot/Photo."""
@@ -181,3 +200,37 @@ class SwitcheOnConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 raise ValueError("invalid_auth")
             data = await resp.json()
             return data.get("boxes") or []
+
+
+class SwitcheOnOptionsFlow(config_entries.OptionsFlow):
+    """Allow users to tune the cloud polling interval per SwitcheOn box."""
+
+    async def async_step_init(self, user_input=None):
+        """Manage the SwitcheOn options."""
+        if user_input is not None:
+            return self.async_create_entry(
+                title="",
+                data={CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL])},
+            )
+
+        current_interval = self.config_entry.options.get(
+            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+        )
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_SCAN_INTERVAL, default=current_interval
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=MIN_SCAN_INTERVAL,
+                        max=MAX_SCAN_INTERVAL,
+                        step=5,
+                        unit_of_measurement="seconds",
+                        mode=NumberSelectorMode.BOX,
+                    )
+                ),
+            }
+        )
+
+        return self.async_show_form(step_id="init", data_schema=schema)
